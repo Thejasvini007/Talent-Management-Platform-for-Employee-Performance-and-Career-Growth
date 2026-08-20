@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Sign in · Talent Management Platform for Employee Performance and Career Growth{% endblock %}
+
+{% block shell %}
+<div class="login-wrap">
+  <div class="login-card">
+
+    <div class="login-brand">
+      <div class="login-logo">🚀</div>
+      <div class="login-title">Talent Management Platform for Employee Performance and Career Growth</div>
+      <div class="login-sub">AI-powered training &amp; knowledge platform</div>
+    </div>
+
+    {% if error %}
+      <div class="flash error" style="margin-bottom: 1rem;">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST">
+      <label class="f-label">Email address</label>
+      <input
+        class="f-input"
+        type="email"
+        name="email"
+        placeholder="you@company.com"
+        required
+      >
+
+      <label class="f-label">Password</label>
+      <input
+        class="f-input"
+        type="password"
+        name="password"
+        placeholder="••••••••"
+        required
+      >
+
+      <button type="submit" class="btn" style="width: 100%; justify-content: center; margin-top: 1.4rem;">
+        🔑 Sign In
+      </button>
+    </form>
+
+    <div class="login-note">
+      🔒 Access is provisioned by your administrator.<br>
+      Contact HR if you have trouble signing in.
+    </div>
+
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% set active_page = "dashboard" %}
+
+{% block title %}Admin Dashboard · Talent Sphere Elevate{% endblock %}
+
+{% block page_title %}Admin Control Center{% endblock %}
+
+{% block content %}
+
+<div class="hero">
+  <h1>Admin Control Center</h1>
+  <p>Platform health, engagement, and assessment performance in one place.</p>
+</div>
+
+<div class="section-h">
+  <h2>Platform Summary</h2>
+</div>
+
+<div class="grid cols-4">
+  <div class="metric">
+    <div class="v">{{ summary.users }}</div>
+    <div class="l">Trainees</div>
+  </div>
+  <div class="metric">
+    <div class="v">{{ summary.active_users }}</div>
+    <div class="l">Active Users</div>
+  </div>
+  <div class="metric">
+    <div class="v">{{ summary.documents }}</div>
+    <div class="l">Documents</div>
+  </div>
+  <div class="metric">
+    <div class="v">{{ summary.chunks }}</div>
+    <div class="l">Knowledge Chunks</div>
+  </div>
+  <div class="metric">
+    <div class="v">{{ summary.sessions }}</div>
+    <div class="l">Chat Sessions</div>
+  </div>
+  <div class="metric">
+    <div class="v">{{ summary.messages }}</div>
+    <div class="l">Messages</div>
+  </div>
+  <div class="metric">
+    <div class="v">{{ summary.exams }}</div>
+    <div class="l">Exams</div>
+  </div>
+  <div class="metric">
+    <div class="v">{{ "%.0f"|format(summary.avg_score_pct) }}%</div>
+    <div class="l">Average Score</div>
+  </div>
+</div>
+
+<div class="section-h" style="margin-top:1.6rem;">
+  <h2>💬 Assistant Activity (30 Days)</h2>
+</div>
+<div class="card static">
+  {% if activity %}
+    <canvas id="activityChart" height="90"></canvas>
+  {% else %}
+    <p>No chat activity yet.</p>
+  {% endif %}
+</div>
+
+<div class="grid cols-2" style="margin-top:1.6rem; align-items: start;">
+  <div>
+    <div class="section-h">
+      <h2>🎯 Exam Score Distribution</h2>
+    </div>
+    <div class="card static">
+      {% if scores %}
+        <canvas id="scoreChart" height="180"></canvas>
+      {% else %}
+        <p>No graded submissions yet.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div>
+    <div class="section-h">
+      <h2>📊 Assignment Funnel</h2>
+    </div>
+    <div class="card static">
+      {% if funnel and funnel.assigned %}
+        <canvas id="funnelChart" height="180"></canvas>
+      {% else %}
+        <p>No exam assignments yet.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="section-h" style="margin-top:1.6rem;">
+  <h2>👥 Learners</h2>
+</div>
+<div class="table-wrap">
+  <table class="data">
+    <tr>
+      <th>Name</th>
+      <th>Status</th>
+      <th>Completed</th>
+      <th>Pending</th>
+      <th>Average</th>
+    </tr>
+    {% for u in learners %}
+    <tr>
+      <td>{{ u.name }}</td>
+      <td><span class="pill mid">{{ u.status }}</span></td>
+      <td>{{ u.completed }}</td>
+      <td>{{ u.pending }}</td>
+      <td>
+        {% if u.avg_pct is not none %}
+          {{ "%.0f"|format(u.avg_pct) }}%
+        {% else %}
+          —
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr>
+      <td colspan="5">No users yet — create them in User Management.</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+{% if activity %}
+new Chart(document.getElementById('activityChart'), {
+  type: 'line',
+  data: {
+    labels: {{ activity | reverse | map(attribute='day') | list | tojson }},
+    datasets: [{
+      label: 'Messages',
+      data: {{ activity | reverse | map(attribute='count') | list | tojson }},
+      borderColor: 'rgba(190,24,93,1)',
+      backgroundColor: 'rgba(190,24,93,0.12)',
+      fill: true,
+      tension: 0.3,
+      pointRadius: 3
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+  }
+});
+{% endif %}
+
+{% if scores %}
+const rawScores = {{ scores | tojson }};
+const buckets = [0,0,0,0,0,0,0,0,0,0];
+rawScores.forEach(function(p) {
+  let idx = Math.min(9, Math.floor(p / 10));
+  buckets[idx]++;
+});
+new Chart(document.getElementById('scoreChart'), {
+  type: 'bar',
+  data: {
+    labels: ['0-10%','10-20%','20-30%','30-40%','40-50%','50-60%','60-70%','70-80%','80-90%','90-100%'],
+    datasets: [{
+      label: 'Submissions',
+      data: buckets,
+      backgroundColor: 'rgba(190,24,93,0.75)',
+      borderRadius: 6
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+  }
+});
+{% endif %}
+
+{% if funnel and funnel.assigned %}
+new Chart(document.getElementById('funnelChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Completed', 'Pending', 'Graded'],
+    datasets: [{
+      data: [{{ funnel.completed }}, {{ funnel.pending }}, {{ funnel.graded }}],
+      backgroundColor: ['rgba(190,24,93,0.85)', 'rgba(236,72,153,0.5)', 'rgba(157,23,77,0.85)'],
+      borderWidth: 0
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { position: 'bottom' } }
+  }
+});
+{% endif %}
+</script>
+{% endblock %}

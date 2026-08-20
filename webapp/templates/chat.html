@@ -1,0 +1,427 @@
+{% extends "base.html" %}
+{% set active_page = "chat" %}
+{% block title %}AI Assistant · Talent Sphere Elevate{% endblock %}
+{% block page_title %}AI Assistant{% endblock %}
+
+{% block content %}
+<div class="chat-layout">
+  <aside class="chat-sessions">
+    <div class="cs-head">
+      <button class="btn sm" id="new-chat" style="width:100%;">
+        ⊕ <span class="cs-newtext">New chat</span>
+      </button>
+    </div>
+    <div class="cs-list" id="cs-list"></div>
+  </aside>
+
+  <div class="chat-main">
+    <div class="chat-scroll" id="chat-scroll">
+      <div class="chat-inner" id="chat-inner">
+        <div id="welcome" style="text-align:center; padding:3rem 1rem;">
+          <div class="avatar" style="width:64px;height:64px;font-size:1.8rem;margin:0 auto 1rem;">🤖</div>
+          <h2>Welcome to your AI Assistant</h2>
+          <p style="color:var(--ls-text-2);">Grounded answers with tables, flowcharts and sources — by text or voice.<br>Ask me to <strong>create an exam</strong> or <strong>post an announcement</strong> and I'll walk you through it.</p>
+          <div style="display:flex; gap:.6rem; justify-content:center; flex-wrap:wrap; margin-top:1.2rem;">
+            <button class="btn secondary sm quick-prompt">📘 Summarise the key topics</button>
+            <button class="btn secondary sm quick-prompt">🔀 Explain a process as a flowchart</button>
+            {% if is_admin %}
+            <button class="btn secondary sm" onclick="startExamWizard('')">📝 Create an exam from a document</button>
+            <button class="btn secondary sm quick-prompt">🎤 Start a mock interview</button>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:1rem 1.2rem; border-top:1px solid var(--ls-border);">
+      <div class="chat-inner" style="display:flex; gap:.6rem; align-items:flex-end;">
+        <textarea class="f-textarea" id="msg-input" rows="1"
+                  style="min-height:44px; flex:1;"
+                  placeholder="Ask anything about your training material…"></textarea>
+        <select class="f-select" id="lang-select" style="width:auto;">
+          {% for name, code in languages.items() %}
+          <option value="{{ code }}">{{ name.title() }}</option>
+          {% endfor %}
+        </select>
+        <button class="icon-btn" id="mic-btn" title="Voice input">🎤</button>
+        <button class="btn" id="send-btn">➤</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.6.1/mermaid.min.js"></script>
+<script>
+  mermaid.initialize({ startOnLoad: false, theme: 'default' });
+</script>
+
+<script>
+const chatInner = document.getElementById('chat-inner');
+const chatScroll = document.getElementById('chat-scroll');
+const welcome = document.getElementById('welcome');
+const msgInput = document.getElementById('msg-input');
+const sendBtn = document.getElementById('send-btn');
+const csList = document.getElementById('cs-list');
+let currentSessionId = null;
+
+function scrollDown() { chatScroll.scrollTop = chatScroll.scrollHeight; }
+
+function renderAssistantHtml(raw) {
+  let blocks = [];
+  let cleaned = raw.replace(/```mermaid\n([\s\S]*?)```/g, (m, code) => {
+    blocks.push(code.trim());
+    return `<div class="mermaid-ph" data-i="${blocks.length - 1}"></div>`;
+  });
+  let html = marked.parse(cleaned);
+  blocks.forEach((code, i) => {
+    html = html.replace(`<div class="mermaid-ph" data-i="${i}"></div>`, `<div class="mermaid">${code}</div>`);
+  });
+  return html;
+}
+
+function addMessage(role, text) {
+  welcome.style.display = 'none';
+  const wrap = document.createElement('div');
+  wrap.className = 'msg ' + role;
+  wrap.innerHTML = `
+    <div class="m-avatar">${role === 'user' ? '🧑' : '🤖'}</div>
+    <div class="m-body">${text}</div>
+  `;
+  chatInner.appendChild(wrap);
+  scrollDown();
+  return wrap.querySelector('.m-body');
+}
+
+async function loadSessions() {
+  const res = await fetch("{{ url_for('chat.sessions_list') }}");
+  const data = await res.json();
+  csList.innerHTML = (data.sessions || []).map(s => `
+    <div class="cs-item ${s.id === currentSessionId ? 'active' : ''}" data-id="${s.id}">
+      <span class="cs-name">${s.name || 'New chat'}</span>
+    </div>
+  `).join('');
+  csList.querySelectorAll('.cs-item').forEach(el => {
+    el.addEventListener('click', () => openSession(parseInt(el.dataset.id)));
+  });
+}
+
+async function openSession(id) {
+  currentSessionId = id;
+  const res = await fetch(`/api/chat/sessions/${id}/messages`);
+  const data = await res.json();
+  chatInner.innerHTML = '';
+  welcome.style.display = 'none';
+  (data.messages || []).forEach(m => addMessage(m.role, m.role === 'assistant' ? renderAssistantHtml(m.content) : m.content));
+  loadSessions();
+}
+
+document.getElementById('new-chat').addEventListener('click', () => {
+  currentSessionId = null;
+  chatInner.innerHTML = '';
+  chatInner.appendChild(welcome);
+  welcome.style.display = 'block';
+  loadSessions();
+});
+
+async function sendMessage(text) {
+  if (!text.trim()) return;
+  msgInput.value = '';
+  addMessage('user', text);
+  const bodyEl = addMessage('assistant', '<span class="typing"><i></i><i></i><i></i></span>');
+
+  const res = await fetch("{{ url_for('chat.chat_send') }}", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({message: text, session_id: currentSessionId})
+  });
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '', answer = '';
+  bodyEl.innerHTML = '';
+
+  while (true) {
+    const {done, value} = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, {stream: true});
+    const lines = buffer.split('\n');
+    buffer = lines.pop();
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const evt = JSON.parse(line);
+      if (evt.type === 'start') currentSessionId = evt.session_id;
+      if (evt.type === 'delta') { answer += evt.text; bodyEl.textContent = answer; scrollDown(); }
+      if (evt.type === 'done') {
+        loadSessions();
+        bodyEl.innerHTML = renderAssistantHtml(answer);
+        mermaid.run({ nodes: bodyEl.querySelectorAll('.mermaid') });
+        if (evt.signals && evt.signals.start_exam_wizard) {
+          startExamWizard(evt.signals.exam_title);
+        }
+      }
+    }
+  }
+}
+
+sendBtn.addEventListener('click', () => sendMessage(msgInput.value));
+msgInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(msgInput.value); }
+});
+document.querySelectorAll('.quick-prompt').forEach(btn => {
+  btn.addEventListener('click', () => sendMessage(btn.textContent.trim()));
+});
+
+// ---------------- Voice input ----------------
+let mediaRecorder = null;
+let audioChunks = [];
+const micBtn = document.getElementById('mic-btn');
+
+micBtn.addEventListener('click', async () => {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop();
+    return;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    audioChunks = [];
+    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+    mediaRecorder.onstop = async () => {
+      micBtn.textContent = '🎤';
+      micBtn.style.background = '';
+      micBtn.style.color = '';
+      stream.getTracks().forEach(t => t.stop());
+
+      const blob = new Blob(audioChunks, { type: 'audio/webm' });
+      const formData = new FormData();
+      formData.append('audio', blob, 'speech.webm');
+
+      msgInput.placeholder = 'Transcribing…';
+      const res = await fetch("{{ url_for('chat.voice_transcribe') }}", {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      msgInput.placeholder = 'Ask anything about your training material…';
+      if (data.text) {
+        msgInput.value = data.text;
+        msgInput.focus();
+      } else if (data.error) {
+        alert(data.error);
+      }
+    };
+    mediaRecorder.start();
+    micBtn.textContent = '⏹';
+    micBtn.style.background = 'var(--ls-danger)';
+    micBtn.style.color = '#fff';
+  } catch (err) {
+    alert('Microphone access denied or unavailable.');
+  }
+});
+
+// ---------------- Exam wizard (guided, chat-driven) ----------------
+
+function escapeHtml(s) {
+  return (s || '').toString().replace(/[&<>"']/g, c => (
+    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
+  ));
+}
+
+let currentWizardEl = null;
+
+function wizardCard(html) {
+  welcome.style.display = 'none';
+  if (currentWizardEl && document.body.contains(currentWizardEl)) {
+    currentWizardEl.innerHTML = html;
+    scrollDown();
+    return;
+  }
+  const wrap = document.createElement('div');
+  wrap.className = 'msg assistant';
+  wrap.innerHTML = `<div class="m-avatar">🤖</div><div class="m-body" id="wizard-body"></div>`;
+  chatInner.appendChild(wrap);
+  currentWizardEl = wrap.querySelector('.m-body');
+  currentWizardEl.innerHTML = html;
+  scrollDown();
+}
+
+async function wizardAction(payload) {
+  const res = await fetch('/api/wizard/exam', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (data.error) { alert(data.error); return; }
+  if (data.cancelled) { wizardCard('<p>Exam wizard cancelled.</p>'); return; }
+  renderWizardStep(data);
+}
+
+function startExamWizard(title) {
+  currentWizardEl = null;
+  wizardAction({ action: 'start', title: title || '' });
+}
+
+function renderWizardStep(data) {
+  const state = data.state;
+  const options = data.options || {};
+  const step = state.step;
+
+  let html = `<div class="wizard-box" style="border:1px solid var(--ls-border); border-radius:12px; overflow:hidden;">
+    <div style="background:var(--ls-gradient); color:#fff; padding:.7rem 1rem; font-weight:700;">📋 Guided Exam Builder</div>
+    <div style="padding:1rem;">`;
+
+  if (state.error) {
+    html += `<div class="flash error" style="margin-bottom:.8rem;">${escapeHtml(state.error)}</div>`;
+  }
+  if (data.message) {
+    html += `<p style="color:var(--ls-text-2); font-size:.85rem;">${escapeHtml(data.message)}</p>`;
+  }
+
+  if (step === 'ask_title') {
+    html += `
+      <label class="f-label">Exam title</label>
+      <input class="f-input" id="wz-title" placeholder="Module 1 — Fundamentals Assessment" value="${escapeHtml(state.title)}">
+      <label class="f-label">Instructions (optional)</label>
+      <input class="f-input" id="wz-desc" placeholder="Answer in your own words." value="${escapeHtml(state.description)}">
+      <button class="btn sm" style="margin-top:1rem;" onclick="wzSubmitTitle()">Continue</button>
+    `;
+  } else if (step === 'pick_docs') {
+    const docs = options.documents || [];
+    html += `<label class="f-label">Source documents</label>`;
+    if (!docs.length) {
+      html += `<p>No documents uploaded yet — go to Document Ingestion first.</p>`;
+    } else {
+      html += `<div style="display:flex; flex-direction:column; gap:.4rem; margin:.5rem 0;">`;
+      docs.forEach(d => {
+        const checked = state.doc_ids.includes(d.id) ? 'checked' : '';
+        html += `<label style="display:flex; align-items:center; gap:.5rem; font-size:.88rem;">
+          <input type="checkbox" class="wz-doc" value="${d.id}" ${checked}>
+          ${escapeHtml(d.filename)} <span style="color:var(--ls-text-2);">(${d.pages} pages)</span>
+        </label>`;
+      });
+      html += `</div><button class="btn sm" onclick="wzSubmitDocs()">Continue</button>`;
+    }
+  } else if (step === 'configure') {
+    const qOpts = options.question_counts || [3, 5, 8, 10, 15];
+    const mOpts = options.marks_options || [5, 10, 15];
+    html += `
+      <div style="display:flex; gap:1rem; flex-wrap:wrap;">
+        <div>
+          <label class="f-label">Questions</label>
+          <select class="f-select" id="wz-numq">
+            ${qOpts.map(n => `<option value="${n}" ${n === state.num_questions ? 'selected' : ''}>${n}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="f-label">Marks each</label>
+          <select class="f-select" id="wz-marks">
+            ${mOpts.map(n => `<option value="${n}" ${n === state.marks_per_question ? 'selected' : ''}>${n}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="f-label">Duration (min)</label>
+          <input class="f-input" id="wz-duration" type="number" value="${state.duration}" style="width:90px;">
+        </div>
+      </div>
+      <button class="btn sm" style="margin-top:1rem;" id="wz-generate-btn" onclick="wzGenerate()">✨ Generate questions</button>
+    `;
+  } else if (step === 'review') {
+    html += `<label class="f-label">Review &amp; edit questions</label>`;
+    (state.questions || []).forEach((q, i) => {
+      html += `<textarea class="f-textarea" data-idx="${i}" style="min-height:60px; margin-bottom:.5rem;">${escapeHtml(q)}</textarea>`;
+    });
+    html += `<button class="btn sm" onclick="wzSubmitQuestions()">Continue</button>`;
+  } else if (step === 'assign') {
+    const users = options.users || [];
+    html += `<label class="f-label">Recipients</label>`;
+    if (!users.length) {
+      html += `<p>No trainees yet — you can still save unassigned.</p>`;
+    } else {
+      html += `<div style="display:flex; flex-direction:column; gap:.4rem; margin:.5rem 0;">`;
+      users.forEach(u => {
+        const checked = state.user_ids.includes(u.id) ? 'checked' : '';
+        html += `<label style="display:flex; align-items:center; gap:.5rem; font-size:.88rem;">
+          <input type="checkbox" class="wz-user" value="${u.id}" ${checked}>
+          ${escapeHtml(u.name)} <span style="color:var(--ls-text-2);">(${escapeHtml(u.email)})</span>
+        </label>`;
+      });
+      html += `</div>`;
+    }
+    html += `<label class="f-label">Due date (optional)</label>
+      <input class="f-input" id="wz-due" type="date">
+      <button class="btn sm" style="margin-top:1rem;" onclick="wzSubmitAssign()">Continue</button>`;
+  } else if (step === 'confirm') {
+    const s = options.summary || {};
+    html += `
+      <div class="table-wrap" style="margin-bottom:1rem;">
+        <table class="data">
+          <tr><td><strong>Title</strong></td><td>${escapeHtml(s.title)}</td></tr>
+          <tr><td><strong>Documents</strong></td><td>${(s.documents || []).join(', ') || '—'}</td></tr>
+          <tr><td><strong>Questions</strong></td><td>${s.num_questions}</td></tr>
+          <tr><td><strong>Marks each</strong></td><td>${s.marks_each}</td></tr>
+          <tr><td><strong>Total marks</strong></td><td>${s.total_marks}</td></tr>
+          <tr><td><strong>Duration</strong></td><td>${s.duration} min</td></tr>
+          <tr><td><strong>Recipients</strong></td><td>${(s.recipients || []).join(', ') || 'None'}</td></tr>
+          <tr><td><strong>Due date</strong></td><td>${escapeHtml(s.due_date)}</td></tr>
+        </table>
+      </div>
+      <button class="btn sm" onclick="wzConfirm()">✅ Create &amp; Assign</button>
+    `;
+  } else if (step === 'done') {
+    // message already shown above — nothing extra needed here
+  }
+
+  html += `</div></div>`;
+  if (step !== 'done') {
+    html += `<div style="margin-top:.5rem;"><button class="btn ghost sm" onclick="wzCancel()">✕ Cancel wizard</button></div>`;
+  }
+  wizardCard(html);
+}
+
+function wzSubmitTitle() {
+  const title = document.getElementById('wz-title').value.trim();
+  const description = document.getElementById('wz-desc').value.trim();
+  if (!title) { alert('Please enter an exam title.'); return; }
+  wizardAction({ action: 'title', title, description });
+}
+
+function wzSubmitDocs() {
+  const ids = Array.from(document.querySelectorAll('.wz-doc:checked')).map(el => parseInt(el.value));
+  if (!ids.length) { alert('Select at least one document.'); return; }
+  wizardAction({ action: 'documents', doc_ids: ids });
+}
+
+function wzGenerate() {
+  const num_questions = parseInt(document.getElementById('wz-numq').value);
+  const marks_per_question = parseInt(document.getElementById('wz-marks').value);
+  const duration = parseInt(document.getElementById('wz-duration').value);
+  const btn = document.getElementById('wz-generate-btn');
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
+  wizardAction({ action: 'configure', num_questions, marks_per_question, duration });
+}
+
+function wzSubmitQuestions() {
+  const questions = Array.from(document.querySelectorAll('#wizard-body textarea[data-idx]')).map(t => t.value);
+  wizardAction({ action: 'questions', questions });
+}
+
+function wzSubmitAssign() {
+  const user_ids = Array.from(document.querySelectorAll('.wz-user:checked')).map(el => parseInt(el.value));
+  const due_date = document.getElementById('wz-due').value || null;
+  wizardAction({ action: 'assign', user_ids, due_date });
+}
+
+function wzConfirm() {
+  wizardAction({ action: 'confirm' });
+}
+
+function wzCancel() {
+  wizardAction({ action: 'cancel' });
+}
+
+loadSessions();
+</script>
+{% endblock %}

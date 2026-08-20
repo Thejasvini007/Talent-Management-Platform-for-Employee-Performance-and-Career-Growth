@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% set active_page = "exams" %}
+{% block title %}My Exams · Talent Sphere Elevate{% endblock %}
+{% block page_title %}My Exams{% endblock %}
+
+{% block content %}
+<div class="section-h">
+  <h2>📝 My Exams</h2>
+  <p>Assessments assigned to you — complete them before the due date.</p>
+</div>
+
+<div class="section-h" style="margin-top:1rem;">
+  <h2 style="font-size:1.05rem;">Pending</h2>
+</div>
+<div class="grid cols-2">
+  {% for a in pending %}
+  <div class="card">
+    <h3>{{ a.title }}</h3>
+    <p style="font-size:.85rem; color:var(--ls-text-2);">
+      {{ a.question_count }} questions · {{ a.total_marks }} marks
+      {% if a.due_date %} · Due {{ a.due_date }}{% endif %}
+    </p>
+    <a class="btn" href="{{ url_for('exams.take_exam', assignment_id=a.assignment_id) }}">▷ Start Exam</a>
+  </div>
+  {% else %}
+  <div class="card static"><p>No pending exams. 🎉</p></div>
+  {% endfor %}
+</div>
+
+<div class="section-h" style="margin-top:1.6rem;">
+  <h2 style="font-size:1.05rem;">Completed</h2>
+</div>
+<div class="table-wrap">
+  <table class="data">
+    <tr><th>Exam</th><th>Score</th><th>Violations</th></tr>
+    {% for a in done %}
+    {% set d = details.get(a.assignment_id) %}
+    <tr>
+      <td>{{ a.title }}</td>
+      <td>
+        {% if d %}
+          {{ d.total_score }}/{{ d.max_score }}
+          ({{ "%.0f"|format(d.total_score * 100.0 / d.max_score) if d.max_score else 0 }}%)
+        {% else %}—{% endif %}
+      </td>
+      <td>{{ d.violations if d and d.violations else 0 }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="3">No completed exams yet.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

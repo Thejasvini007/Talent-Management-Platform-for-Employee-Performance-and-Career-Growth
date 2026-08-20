@@ -1,0 +1,19 @@
+{% extends "base.html" %} {% set active_page = 'chat' %} {% block title %}AI Assistant · Talent Sphere Elevate{% endblock %} {% block page_title %}AI Assistant{% endblock %} {% block head %} {% endblock %} {% block main %}
+add_circleNew chat
+🤖
+Welcome to your AI Assistant
+Grounded answers with tables, flowcharts and sources — by text or voice.
+{% if is_admin %}Ask me to create an exam or post an announcement and I'll walk you through it.{% else %}Ask about your training material, your exams, or your progress.{% endif %}
+
+📘 Summarise the key topics in the training documents 🧭 Explain a core process as a step-by-step flowchart {% if is_admin %} 📝 Create an exam from a document {% else %} 🎯 How am I doing on my exams? {% endif %} 🎙️ Start a mock interview
+{% if not llm_ready %}
+🔑 Groq API key missing. Add GROQ_API_KEY to your .env and restart to enable AI answers.
+{% endif %}
+Ask anything about your training material…
+ 
+{{ name|title }}
+ volume_off mic graphic_eq arrow_upward
+Enter to send · Shift+Enter for a new line · 🎙️ mic to dictate
+Connecting…
+mic close
+{% endblock %} {% block scripts %} {% endblock %}

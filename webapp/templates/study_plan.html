@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Study Plan{% endblock %}
+{% block content %}
+<div class="hero">
+  <h1>My Study Plan</h1>
+  <p>Complete each day in order to unlock the next.</p>
+</div>
+
+{% if not weeks %}
+  <div class="card static"><p>No study plan has been published yet. Check back soon.</p></div>
+{% else %}
+  {% for week in weeks %}
+  <div class="section-h" style="margin-top:1.4rem;">
+    <h2>📅 Week {{ week.week_no }} — {{ week.title }}</h2>
+  </div>
+  <div class="grid cols-4">
+    {% for day in week.days %}
+    <div class="card {{ 'static' if not day.unlocked }}" style="{{ 'opacity:.55;' if not day.unlocked }}">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.5rem;">
+        <span class="pill mid">Day {{ day.day_no }}</span>
+        {% if not day.unlocked %}
+          <span title="Locked">🔒</span>
+        {% elif day.status == 'read_complete' or day.status == 'exam_completed' %}
+          <span title="Completed">✅</span>
+        {% endif %}
+      </div>
+      <h3 style="font-size:.95rem; min-height:2.4em;">{{ day.topic }}</h3>
+
+      {% if not day.unlocked %}
+        <p style="font-size:.78rem; color:var(--ls-text-2);">Complete the previous day to unlock.</p>
+      {% elif day.exam_id %}
+        {% if day.status == 'exam_completed' %}
+          <span class="pill high">Exam completed</span>
+        {% elif day.status == 'exam_pending' %}
+          <a href="{{ url_for('exams.my_exams') }}" class="btn sm" style="margin-top:.4rem;">📝 Take exam</a>
+        {% else %}
+          <span class="pill outline">Exam not yet assigned</span>
+        {% endif %}
+      {% else %}
+        {% if day.document_id %}
+          <button type="button" class="btn secondary sm" style="margin-top:.2rem;"
+                  onclick="openPdfModal('{{ url_for('main.document_file', doc_id=day.document_id) }}', '{{ day.topic|e }}')">
+            📄 Open document
+          </button>
+        {% endif %}
+        {% if day.status == 'read_complete' %}
+          <div style="margin-top:.5rem;"><span class="pill high">Completed</span></div>
+        {% else %}
+          <form action="{{ url_for('main.study_plan_mark_complete', day_id=day.id) }}" method="post" style="margin-top:.5rem;">
+            <button type="submit" class="btn ghost sm">✅ Mark as complete</button>
+          </form>
+        {% endif %}
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+{% endif %}
+
+<div id="pdf-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:100; align-items:center; justify-content:center;">
+  <div style="background:#fff; width:92%; max-width:960px; height:88vh; border-radius:14px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,.35);">
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:.9rem 1.2rem; border-bottom:1px solid var(--ls-border);">
+      <strong id="pdf-modal-title">Document</strong>
+      <button onclick="closePdfModal()" class="btn ghost sm">✕ Close</button>
+    </div>
+    <iframe id="pdf-modal-frame" src="" style="flex:1; border:none; width:100%;"></iframe>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openPdfModal(url, title) {
+  document.getElementById('pdf-modal-frame').src = url;
+  document.getElementById('pdf-modal-title').textContent = title || 'Document';
+  document.getElementById('pdf-modal').style.display = 'flex';
+}
+function closePdfModal() {
+  document.getElementById('pdf-modal').style.display = 'none';
+  document.getElementById('pdf-modal-frame').src = '';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Talent Sphere Elevate{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+{% block shell %}
+<div class="shell">
+
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-logo">🚀</div>
+      <div>
+        <div class="brand-name">Talent <span>Sphere</span></div>
+        <div class="brand-sub">AI Training Platform</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      {% if current_user.role == 'admin' %}
+        <div class="nav-label">Overview</div>
+        <a href="{{ url_for('admin.dashboard') }}" class="nav-item"><span class="ico">📊</span><span class="nav-text">Dashboard</span></a>
+
+        <div class="nav-label">Workspace</div>
+        <a href="{{ url_for('chat.chat_page') }}" class="nav-item"><span class="ico">💬</span><span class="nav-text">AI Assistant</span></a>
+        
+        <a href="{{ url_for('main.search_page') }}" class="nav-item"><span class="ico">🔍</span><span class="nav-text">Knowledge Search</span></a>
+
+        <div class="nav-label">Administration</div>
+        <a href="{{ url_for('admin.users') }}" class="nav-item"><span class="ico">👥</span><span class="nav-text">User Management</span></a>
+        <a href="{{ url_for('admin.documents') }}" class="nav-item"><span class="ico">📤</span><span class="nav-text">Document Ingestion</span></a>
+        <a href="{{ url_for('admin.exams') }}" class="nav-item"><span class="ico">📝</span><span class="nav-text">Exams</span></a>
+        <a href="{{ url_for('admin.announcements') }}" class="nav-item"><span class="ico">📢</span><span class="nav-text">Announcements</span></a>
+        <a href="{{ url_for('admin.learning_path') }}" class="nav-item"><span class="ico">🗺️</span><span class="nav-text">Learning Path Builder</span></a>
+
+      {% else %}
+<div class="nav-label">Workspace</div>
+<a href="{{ url_for('main.home') }}" class="nav-item"><span class="ico">🏠</span><span class="nav-text">Home</span></a>
+<a href="{{ url_for('chat.chat_page') }}" class="nav-item"><span class="ico">💬</span><span class="nav-text">AI Assistant</span></a>
+<a href="{{ url_for('main.search_page') }}" class="nav-item"><span class="ico">🔍</span><span class="nav-text">Knowledge Search</span></a>
+<a href="{{ url_for('exams.my_exams') }}" class="nav-item"><span class="ico">📝</span><span class="nav-text">My Exams</span></a>
+<a href="{{ url_for('main.announcements') }}" class="nav-item"><span class="ico">📢</span><span class="nav-text">Announcements</span></a>
+<a href="{{ url_for('main.study_plan') }}" class="nav-item {{ 'active' if request.endpoint == 'main.study_plan' else '' }}">📘 Study Plan</a>
+{% endif %}
+    </nav>
+
+    <div class="sidebar-foot">
+      <div class="avatar">{{ (current_user.name or '?')[:1]|upper }}</div>
+      <div class="userbox">
+        <div class="name">{{ current_user.name }}</div>
+        <div class="role">{{ current_user.role }}</div>
+      </div>
+      <a href="{{ url_for('auth.logout') }}" class="icon-btn" title="Logout">🚪</a>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="spacer"></div>
+
+      <div style="position: relative;">
+        <button class="icon-btn" title="Notifications" onclick="toggleDropdown('notif-dropdown')">
+          🔔
+          {% if unread_count and unread_count > 0 %}
+            <span class="badge-dot">{{ unread_count if unread_count < 100 else '99+' }}</span>
+          {% endif %}
+        </button>
+        <div id="notif-dropdown" class="dropdown">
+          <div class="dd-head">
+            <span>Notifications</span>
+            <button class="dd-link" onclick="markAllRead()">Mark all read</button>
+          </div>
+          <div id="notif-list">
+            <div class="dd-empty">Loading...</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="position: relative;">
+        <button class="icon-btn" title="Settings" onclick="toggleDropdown('settings-dropdown')">⚙️</button>
+        <div id="settings-dropdown" class="dropdown">
+          <div class="dd-head"><span>Settings</span></div>
+          <div class="dd-item"><a href="{{ url_for('auth.logout') }}">Logout</a></div>
+        </div>
+      </div>
+    </header>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flashes">
+          {% for category, message in messages %}
+            <div class="flash {{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <main class="content">
+      {% block main %}
+        {% block content %}{% endblock %}
+      {% endblock %}
+    </main>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}{% endblock %}
+<script>
+function toggleDropdown(id) {
+  const el = document.getElementById(id);
+  const isOpen = el.classList.contains('open');
+  document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('open'));
+  if (!isOpen) {
+    el.classList.add('open');
+    if (id === 'notif-dropdown') loadNotifications();
+  }
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.dropdown') && !e.target.closest('.icon-btn')) {
+    document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('open'));
+  }
+});
+
+function loadNotifications() {
+  fetch('/api/notifications')
+    .then(r => r.json())
+    .then(data => {
+      const list = document.getElementById('notif-list');
+      if (!data.items || data.items.length === 0) {
+        list.innerHTML = '<div class="dd-empty">No notifications yet.</div>';
+        return;
+      }
+      list.innerHTML = data.items.map(n => `
+        <div class="dd-item ${n.read ? '' : 'unread'}">
+          <div class="t">${n.title || 'Notification'}</div>
+          <div class="b">${n.body || ''}</div>
+        </div>
+      `).join('');
+    });
+}
+
+function markAllRead() {
+  fetch('/api/notifications/read', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({})
+  }).then(() => loadNotifications());
+}
+</script>
+</body>
+</html>

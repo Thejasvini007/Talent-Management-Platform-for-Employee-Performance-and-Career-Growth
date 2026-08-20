@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% set active_page = "announcements" %}
+{% block title %}Announcements · Talent Sphere Elevate{% endblock %}
+{% block page_title %}Announcements{% endblock %}
+
+{% block content %}
+<div class="section-h">
+  <h2>📢 Announcements</h2>
+  <p>Publish updates to every trainee — they're notified instantly.</p>
+</div>
+
+<div class="card">
+  <h3>✏️ New announcement</h3>
+  <form action="{{ url_for('admin.announcements_create') }}" method="post">
+    <div class="f-row">
+      <div style="flex:2;">
+        <label class="f-label">Title</label>
+        <input class="f-input" name="title" placeholder="New Exam Is Scheduled" required>
+      </div>
+      <div style="flex:1;">
+        <label class="f-label">Category</label>
+        <select class="f-select" name="category">
+          {% for c in categories %}
+          <option value="{{ c }}">{{ c }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <label class="f-label">Message</label>
+    <textarea class="f-textarea" name="body" placeholder="All students are asked to visit the exam portal to view the exam schedule." required></textarea>
+    <div style="margin-top:1rem;">
+      <button type="submit" class="btn">📣 Publish & notify all</button>
+    </div>
+  </form>
+</div>
+
+<div class="section-h" style="margin-top:1.6rem;">
+  <h2>Published</h2>
+</div>
+
+<div style="display:flex; flex-direction:column; gap:.8rem;">
+  {% for a in announcements %}
+  <div class="card static" style="display:flex; justify-content:space-between; align-items:flex-start;">
+    <div>
+      <div style="display:flex; align-items:center; gap:.6rem; margin-bottom:.3rem;">
+        <h3 style="margin:0;">{{ a.title }}</h3>
+        {% set cat_class = {'General': 'mid', 'Training': 'high', 'Exam': 'danger', 'Policy': 'warn', 'Event': 'outline'} %}
+        <span class="pill {{ cat_class.get(a.category, 'mid') }}">{{ a.category }}</span>
+      </div>
+      <div style="font-size:.78rem; color:var(--ls-text-2); margin-bottom:.4rem;">
+        {{ a.created_at[:16] if a.created_at else "" }} · {{ a.created_by }}
+      </div>
+      <p style="font-size:.9rem; margin:0;">{{ a.body }}</p>
+    </div>
+    <form action="{{ url_for('admin.announcements_delete', announcement_id=a.id) }}" method="post"
+          onsubmit="return confirm('Delete this announcement?');">
+      <button type="submit" class="btn danger sm">🗑</button>
+    </form>
+  </div>
+  {% else %}
+  <div class="card static"><p>No announcements published yet.</p></div>
+  {% endfor %}
+</div>
+{% endblock %}

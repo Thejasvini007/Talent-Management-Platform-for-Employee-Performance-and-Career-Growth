@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% set active_page = "search" %}
+{% block title %}Knowledge Search · Talent Sphere Elevate{% endblock %}
+{% block page_title %}Knowledge Search{% endblock %}
+
+{% block content %}
+<div class="section-h">
+  <h2>🔍 Knowledge Search</h2>
+  <p>Direct semantic search over the document index — see exactly what the AI retrieves.</p>
+</div>
+
+<div class="card">
+  <div class="f-row">
+    <div style="flex:3;">
+      <label class="f-label">Search query</label>
+      <input class="f-input" type="text" id="q" placeholder="e.g. What is the onboarding process?">
+    </div>
+    <div style="flex:1;">
+      <label class="f-label">Results (Top-K)</label>
+      <select class="f-select" id="topk">
+        <option value="3">3</option>
+        <option value="5" selected>5</option>
+        <option value="8">8</option>
+        <option value="10">10</option>
+      </select>
+    </div>
+  </div>
+  <div style="margin-top:1rem;">
+    <button class="btn" id="go">🔍 Search</button>
+  </div>
+</div>
+
+<div id="results" style="margin-top:1.2rem; display:flex; flex-direction:column; gap:.8rem;"></div>
+
+<script>
+document.getElementById('go').addEventListener('click', async () => {
+  const query = document.getElementById('q').value.trim();
+  const top_k = parseInt(document.getElementById('topk').value, 10);
+  const box = document.getElementById('results');
+  if (!query) return;
+  box.innerHTML = '<div class="card static"><p>Searching…</p></div>';
+
+  const res = await fetch("{{ url_for('main.api_search') }}", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({query, top_k})
+  });
+  const data = await res.json();
+
+  if (data.error) {
+    box.innerHTML = `<div class="card static"><p>${data.error}</p></div>`;
+    return;
+  }
+  if (data.empty_index) {
+    box.innerHTML = '<div class="card static"><p>No documents indexed yet.</p></div>';
+    return;
+  }
+  if (!data.results || data.results.length === 0) {
+    box.innerHTML = '<div class="card static"><p>No matches found.</p></div>';
+    return;
+  }
+  box.innerHTML = data.results.map(r => `
+    <div class="card static">
+      <div style="display:flex; justify-content:space-between; margin-bottom:.4rem;">
+        <strong>${r.source || r.filename || 'Document'}</strong>
+        <span class="pill outline">${(r.score ? (r.score*100).toFixed(0) : '?')}% match</span>
+      </div>
+      <p style="font-size:.88rem; color:var(--ls-text-2);">${r.text || r.chunk || ''}</p>
+    </div>
+  `).join('');
+});
+document.getElementById('q').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('go').click();
+});
+</script>
+{% endblock %}

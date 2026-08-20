@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Assistant</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #0b1220;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            text-align: center;
+        }
+
+        .status {
+            margin-bottom: 20px;
+            color: #7CFC98;
+            font-weight: bold;
+        }
+
+        .circle {
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #4f8cff, #0b1220);
+            margin: 20px auto;
+            box-shadow: 0 0 30px #4f8cff;
+        }
+
+        button {
+            padding: 15px 30px;
+            font-size: 20px;
+            border: none;
+            border-radius: 30px;
+            background: #2f80ed;
+            color: white;
+            cursor: pointer;
+        }
+
+        p {
+            color: #cccccc;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+    <div class="status">● READY</div>
+
+    <div class="circle"></div>
+
+    <button onclick="startVoice()">🎤 Tap to Start Talking</button>
+
+    <p>Allow microphone access when prompted</p>
+
+    <h2>Voice Assistant</h2>
+</div>
+
+<script>
+function startVoice() {
+    alert("Voice assistant started!");
+}
+</script>
+
+</body>
+</html>

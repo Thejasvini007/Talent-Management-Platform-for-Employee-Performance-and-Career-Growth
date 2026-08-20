@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% set active_page = "exams" %}
+{% block title %}Exam Management · Talent Sphere Elevate{% endblock %}
+{% block page_title %}Exam Management{% endblock %}
+
+{% block content %}
+<div class="section-h">
+  <h2>📝 Exam Management</h2>
+  <p>Create assessments (manual or AI-generated), assign to trainees, review AI-graded results.</p>
+</div>
+
+<div style="display:flex; gap:1.2rem; align-items:flex-start;">
+
+  <div class="card" style="flex:1.4;">
+    <h3>✏️ Create exam</h3>
+    <form action="{{ url_for('admin.exams_create') }}" method="post" id="exam-form">
+      <label class="f-label">Title</label>
+      <input class="f-input" name="title" placeholder="Module 1 — Fundamentals Assessment" required>
+
+      <label class="f-label">Instructions (optional)</label>
+      <input class="f-input" name="description" placeholder="Answer all questions in your own words.">
+
+      <div class="f-row">
+        <div>
+          <label class="f-label">Type</label>
+          <select class="f-select" name="exam_type">
+            <option value="write">✍️ Written</option>
+            <option value="voice">🎤 Voice</option>
+          </select>
+        </div>
+        <div>
+          <label class="f-label">Duration (min)</label>
+          <input class="f-input" type="number" name="duration" value="30">
+        </div>
+        <div>
+          <label class="f-label">Marks / question</label>
+          <input class="f-input" type="number" name="marks" value="10">
+        </div>
+      </div>
+
+      {% if llm_ready %}
+      <div class="card static" style="margin-top:1rem;">
+        <h3>✨ Generate questions with AI</h3>
+        <label class="f-label">Source documents</label>
+        <select class="f-select" id="gen-docs" multiple size="4">
+          {% for doc in documents %}
+          <option value="{{ doc.id }}">{{ doc.filename }}</option>
+          {% endfor %}
+        </select>
+        <div class="f-row" style="margin-top:.6rem;">
+          <select class="f-select" id="gen-count">
+            <option value="3">3</option>
+            <option value="5" selected>5</option>
+            <option value="8">8</option>
+            <option value="10">10</option>
+          </select>
+          <button type="button" class="btn secondary" id="gen-btn">✨ Generate</button>
+        </div>
+      </div>
+      {% endif %}
+
+      <label class="f-label">Questions — one per line</label>
+      <textarea class="f-textarea" name="questions" id="questions-box" placeholder="1. Explain the account opening process.&#10;2. What are the key compliance checks?"></textarea>
+
+      <div style="margin-top:1rem;">
+        <button type="submit" class="btn">💾 Create exam</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card" style="flex:1;">
+    <h3>📌 Assign</h3>
+    <form method="get" action="{{ url_for('admin.exams') }}">
+      <label class="f-label">Exam</label>
+      <select class="f-select" name="exam" onchange="this.form.submit()">
+        {% for e in exams %}
+        <option value="{{ e.id }}" {{ "selected" if selected and selected.id == e.id }}>
+          {{ e.title }} · {{ e.question_count }}q · {{ e.total_marks }} marks
+        </option>
+        {% endfor %}
+      </select>
+    </form>
+
+    {% if selected %}
+    <form action="{{ url_for('admin.exams_assign', exam_id=selected.id) }}" method="post" style="margin-top:1rem;">
+      <label class="f-label">Assign to</label>
+      <div style="max-height:180px; overflow-y:auto; border:1px solid var(--ls-border); border-radius:10px; padding:.5rem;">
+        {% for u in users %}
+        <label style="display:flex; align-items:center; gap:.5rem; padding:.3rem 0; font-size:.86rem;">
+          <input type="checkbox" name="user_ids" value="{{ u.id }}">
+          {{ u.name }} ({{ u.email }})
+        </label>
+        {% endfor %}
+      </div>
+      <label class="f-label">Due date (optional)</label>
+      <input class="f-input" type="date" name="due_date">
+      <div style="margin-top:1rem; display:flex; gap:.5rem;">
+        <button type="submit" class="btn">▷ Assign & notify</button>
+      </div>
+    </form>
+    <form action="{{ url_for('admin.exams_delete', exam_id=selected.id) }}" method="post"
+          style="margin-top:.6rem;" onsubmit="return confirm('Delete this exam?');">
+      <button type="submit" class="btn danger">🗑 Delete this exam</button>
+    </form>
+
+    <div class="section-h" style="margin-top:1.4rem;">
+      <h2 style="font-size:1rem;">Assignments</h2>
+    </div>
+    <div class="table-wrap">
+      <table class="data">
+        <tr><th>Trainee</th><th>Status</th><th>Score</th></tr>
+        {% for a in assignments %}
+        <tr>
+          <td>{{ a.user_name }}</td>
+          <td><span class="pill {{ 'high' if a.status == 'completed' else 'warn' }}">{{ a.status }}</span></td>
+          <td>{% if a.total_score is not none %}{{ a.total_score }}/{{ a.max_score }}{% else %}—{% endif %}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3">No assignments yet.</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+{% if llm_ready %}
+document.getElementById('gen-btn')?.addEventListener('click', async () => {
+  const docIds = Array.from(document.getElementById('gen-docs').selectedOptions).map(o => o.value);
+  const count = document.getElementById('gen-count').value;
+  const examType = document.querySelector('[name=exam_type]').value;
+  const marks = document.querySelector('[name=marks]').value;
+  if (docIds.length === 0) { alert('Select at least one document.'); return; }
+
+  const res = await fetch("{{ url_for('admin.exams_generate') }}", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({doc_ids: docIds, count: parseInt(count), marks: parseFloat(marks), exam_type: examType})
+  });
+  const data = await res.json();
+  if (data.error) { alert(data.error); return; }
+  document.getElementById('questions-box').value =
+    data.questions.map((q, i) => `${i+1}. ${q.question || q}`).join('\n');
+});
+{% endif %}
+</script>
+{% endblock %}

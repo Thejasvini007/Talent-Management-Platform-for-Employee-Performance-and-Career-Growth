@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% set active_page = "documents" %}
+{% block title %}Document Library · Talent Sphere Elevate{% endblock %}
+{% block page_title %}Document Library{% endblock %}
+
+{% block content %}
+<div class="section-h">
+  <h2>📄 Document Library</h2>
+  <p>Every document indexed into the knowledge base, with in-app preview.</p>
+</div>
+
+<div style="display:flex; gap:1.2rem; align-items:flex-start;">
+  <div style="width:300px; flex:none; display:flex; flex-direction:column; gap:.6rem;">
+    {% for doc in documents %}
+    <a href="{{ url_for('main.documents') }}?doc={{ doc.id }}"
+       class="card {{ 'static' if selected and selected.id == doc.id else '' }}"
+       style="text-decoration:none; color:inherit; {{ 'border-color: var(--ls-primary); box-shadow: var(--ls-shadow-hover);' if selected and selected.id == doc.id else '' }}">
+      <h3 style="margin-bottom:.2rem;">{{ doc.filename }}</h3>
+      <div style="font-size:.78rem; color:var(--ls-text-2);">
+        {{ doc.pages }} pages · {{ doc.chunks }} chunks · {{ "%.0f"|format(doc.size_kb) }} KB · {{ doc.uploaded_at[:10] if doc.uploaded_at else "" }}
+      </div>
+    </a>
+    {% else %}
+    <div class="card static"><p>No documents yet.</p></div>
+    {% endfor %}
+  </div>
+
+  <div style="flex:1; min-width:0;">
+    {% if selected %}
+    <div class="card static" style="margin-bottom:.8rem; display:flex; align-items:center; justify-content:space-between;">
+      <div>
+        <h3 style="margin:0;">{{ selected.filename }}</h3>
+        <div style="font-size:.8rem; color:var(--ls-text-2);">
+          Uploaded by {{ selected.uploaded_by }} on {{ selected.uploaded_at[:10] if selected.uploaded_at else "" }}
+        </div>
+      </div>
+      <div style="display:flex; gap:.5rem;">
+        <a class="btn secondary sm" href="{{ url_for('main.document_file', doc_id=selected.id) }}" download>⬇ Download</a>
+        <a class="btn sm" href="{{ url_for('main.document_file', doc_id=selected.id) }}" target="_blank">⤢ Fullscreen</a>
+      </div>
+    </div>
+    <div class="card static" style="padding:0; overflow:hidden;">
+      <iframe src="{{ url_for('main.document_file', doc_id=selected.id) }}"
+              style="width:100%; height:75vh; border:none;"></iframe>
+    </div>
+    {% else %}
+    <div class="card static"><p>Select a document to preview it here.</p></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

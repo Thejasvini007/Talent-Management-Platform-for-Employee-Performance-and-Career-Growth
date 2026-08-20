@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% set active_page = "learning_path" %}
+{% block title %}Learning Path Builder · Talent Sphere Elevate{% endblock %}
+{% block page_title %}Learning Path Builder{% endblock %}
+
+{% block content %}
+<div class="section-h">
+  <h2>🗺️ Learning Path Builder</h2>
+  <p>Plan week-by-week modules, linking each day to study material.</p>
+</div>
+
+<div class="card">
+  <h3>➕ New week</h3>
+  <form action="{{ url_for('admin.learning_path_create_week') }}" method="post">
+    <div class="f-row">
+      <div>
+        <label class="f-label">Week number</label>
+        <input class="f-input" type="number" name="week_no" value="{{ weeks|length + 1 }}" min="1" required>
+      </div>
+      <div style="flex:2;">
+        <label class="f-label">Week title</label>
+        <input class="f-input" name="title" placeholder="Week {{ weeks|length + 1 }}">
+      </div>
+    </div>
+    <div style="margin-top:1rem;">
+      <button type="submit" class="btn">➕ Create week</button>
+    </div>
+  </form>
+</div>
+
+{% for w in weeks %}
+<div class="card" style="margin-top:1.2rem;">
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <h3>📅 Week {{ w.week_no }} — {{ w.title }}</h3>
+    <form action="{{ url_for('admin.learning_path_delete', path_id=w.id) }}" method="post"
+          onsubmit="return confirm('Delete this week?');">
+      <button type="submit" class="btn danger sm">🗑</button>
+    </form>
+  </div>
+
+  {% for d in w.days %}
+  <div class="table-wrap" style="margin:.6rem 0;">
+    <table class="data">
+      <tr>
+        <td style="width:80px;"><span class="pill mid">Day {{ d.day_no }}</span></td>
+        <td>{{ d.topic }}</td>
+        <td>{{ d.document_name or "—" }}</td>
+        <td>{% if d.auto_gen_exam %}<span class="pill high">Auto-exam</span>{% endif %}</td>
+      </tr>
+    </table>
+  </div>
+  {% endfor %}
+
+  <form action="{{ url_for('admin.learning_path_add_day', path_id=w.id) }}" method="post"
+        style="margin-top:.8rem; display:flex; gap:.6rem; align-items:flex-end; flex-wrap:wrap;">
+    <div>
+      <label class="f-label">Day</label>
+      <input class="f-input" type="number" name="day_no" value="{{ w.days|length + 1 }}" min="1" style="width:80px;">
+    </div>
+    <div style="flex:1; min-width:180px;">
+      <label class="f-label">Topic</label>
+      <input class="f-input" name="topic" placeholder="Data Science" required>
+    </div>
+    <div style="flex:1; min-width:180px;">
+      <label class="f-label">Study material</label>
+      <select class="f-select" name="document_id">
+        <option value="">Select from Library…</option>
+        {% for doc in documents %}
+        <option value="{{ doc.id }}">{{ doc.filename }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <label style="display:flex; align-items:center; gap:.4rem; padding-bottom:.6rem; font-size:.85rem;">
+      <input type="checkbox" name="auto_gen_exam"> Auto-generate exam
+    </label>
+    <button type="submit" class="btn secondary sm">➕ Add day</button>
+  </form>
+</div>
+{% else %}
+<div class="card static" style="margin-top:1.2rem;"><p>No weeks yet — create your first one above.</p></div>
+{% endfor %}
+{% endblock %}

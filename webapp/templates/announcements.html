@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% set active_page = 'announce' %}
+{% block title %}Announcements · Talent Sphere Elevate{% endblock %}
+{% block page_title %}Announcements{% endblock %}
+
+{% block content %}
+<div class="section-h">
+  <h2>📣 Announcements</h2>
+  <p>News and updates from your training team.</p>
+</div>
+
+{% set cat_class = {'General': 'mid', 'Training': 'high', 'Exam': 'danger', 'Policy': 'warn', 'Event': 'outline'} %}
+
+{% if not announcements %}
+  <div class="card static" style="text-align:center; padding:2.5rem 1rem;">
+    <div style="font-size:2rem; margin-bottom:.5rem;">📭</div>
+    <h3>Nothing here yet</h3>
+    <p style="color:var(--ls-text-2);">Announcements from your admin will appear here.</p>
+  </div>
+{% endif %}
+
+<div style="display:flex; flex-direction:column; gap:.8rem;">
+  {% for a in announcements %}
+  <div class="card static">
+    <div style="display:flex; align-items:center; gap:.6rem; margin-bottom:.3rem;">
+      <h3 style="margin:0;">{{ a.title }}</h3>
+      <span class="pill {{ cat_class.get(a.category, 'mid') }}">{{ a.category }}</span>
+    </div>
+    <div style="font-size:.78rem; color:var(--ls-text-2); margin-bottom:.5rem;">
+      {{ a.created_at[:16] if a.created_at else "" }} UTC
+    </div>
+    <p style="font-size:.9rem; margin:0;">{{ a.body }}</p>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

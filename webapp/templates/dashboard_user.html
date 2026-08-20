@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% set active_page = "dashboard" %}
+{% block title %}My Dashboard · Talent Sphere Elevate{% endblock %}
+{% block page_title %}Welcome back{% endblock %}
+
+{% block content %}
+<div class="hero">
+  <h1>Welcome back, {{ current_user.name }} 👋</h1>
+  <p>Here's where you stand today.</p>
+</div>
+
+<div class="grid cols-4">
+  <div class="metric">
+    <div class="v">{{ pending_exams }}</div>
+    <div class="l">Pending Exams</div>
+  </div>
+  <div class="metric">
+    <div class="v">{% if avg_pct is not none %}{{ "%.0f"|format(avg_pct) }}%{% else %}—{% endif %}</div>
+    <div class="l">Average Score</div>
+  </div>
+  <div class="metric">
+    <div class="v">{{ sessions }}</div>
+    <div class="l">Chat Sessions</div>
+  </div>
+  <div class="metric">
+    <div class="v">{{ index.total_chunks if index and index.total_chunks else 0 }}</div>
+    <div class="l">Knowledge Chunks</div>
+  </div>
+</div>
+
+<div class="section-h" style="margin-top:1.6rem;">
+  <h2>📝 Your Exams</h2>
+</div>
+<div class="table-wrap">
+  <table class="data">
+    <tr><th>Exam</th><th>Status</th><th>Due</th><th></th></tr>
+    {% for a in assignments %}
+    <tr>
+      <td>{{ a.title }}</td>
+      <td><span class="pill {{ 'high' if a.status == 'completed' else 'warn' }}">{{ a.status }}</span></td>
+      <td>{{ a.due_date or "—" }}</td>
+      <td>
+        {% if a.status == 'assigned' %}
+        <a class="btn sm" href="{{ url_for('exams.take_exam', assignment_id=a.assignment_id) }}">Start</a>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4">No exams assigned yet.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="section-h" style="margin-top:1.6rem;">
+  <h2>📢 Announcements</h2>
+</div>
+<div style="display:flex; flex-direction:column; gap:.7rem;">
+  {% for a in announcements %}
+  <div class="card static">
+    <div style="display:flex; align-items:center; gap:.6rem; margin-bottom:.3rem;">
+      <h3 style="margin:0; font-size:.95rem;">{{ a.title }}</h3>
+      <span class="pill mid">{{ a.category }}</span>
+    </div>
+    <p style="font-size:.85rem; margin:0;">{{ a.body }}</p>
+  </div>
+  {% else %}
+  <div class="card static"><p>No announcements yet.</p></div>
+  {% endfor %}
+</div>
+{% endblock %}

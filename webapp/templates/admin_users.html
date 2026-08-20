@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% set active_page = "users" %}
+{% block title %}User Management · Talent Sphere Elevate{% endblock %}
+{% block page_title %}User Management{% endblock %}
+
+{% block content %}
+<div class="section-h">
+  <h2>👥 User Management</h2>
+  <p>Provision trainee accounts — credentials are stored hashed, never in plain text.</p>
+</div>
+
+<div style="display:flex; gap:1.2rem; align-items:flex-start;">
+  <div class="card" style="flex:2;">
+    <h3>➕ Create user</h3>
+    <form action="{{ url_for('admin.users_create') }}" method="post">
+      <div class="f-row">
+        <div>
+          <label class="f-label">Employee ID</label>
+          <input class="f-input" name="emp_id" placeholder="EMP-1024" required>
+        </div>
+        <div>
+          <label class="f-label">Full name</label>
+          <input class="f-input" name="name" placeholder="Priya Sharma" required>
+        </div>
+      </div>
+      <div class="f-row">
+        <div>
+          <label class="f-label">Email</label>
+          <input class="f-input" type="email" name="email" placeholder="priya@company.com" required>
+        </div>
+        <div>
+          <label class="f-label">Training domain</label>
+          <select class="f-select" name="domain">
+            {% for d in domains %}
+            <option value="{{ d }}">{{ d }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <label class="f-label">Password (leave blank to auto-generate a strong one)</label>
+      <input class="f-input" type="text" name="password" placeholder="Auto-generate">
+      <div style="margin-top:1rem;">
+        <button type="submit" class="btn">👤➕ Create user</button>
+      </div>
+    </form>
+  </div>
+
+  <div style="flex:1; display:flex; flex-direction:column; gap:.8rem;">
+    <div class="grid cols-2">
+      <div class="metric">
+        <div class="v">{{ users|length }}</div>
+        <div class="l">Total Users</div>
+      </div>
+      <div class="metric">
+        <div class="v">{{ users|selectattr('status','equalto','active')|list|length }}</div>
+        <div class="l">Currently Active</div>
+      </div>
+    </div>
+    <div class="card static">
+      <h3>Quick tips</h3>
+      <p style="font-size:.85rem; color:var(--ls-text-2);">
+        • Share the generated password immediately — it can't be shown again.<br>
+        • Reset issues a fresh password; delete removes the user and all their data.<br>
+        • New users get notified automatically when you assign exams or publish announcements.
+      </p>
+    </div>
+  </div>
+</div>
+
+<div class="section-h" style="margin-top:1.6rem;">
+  <h2>Accounts</h2>
+</div>
+<div class="table-wrap">
+  <table class="data">
+    <tr>
+      <th>Employee ID</th><th>Name</th><th>Email</th><th>Domain</th>
+      <th>Status</th><th>Last login</th><th>Actions</th>
+    </tr>
+    {% for u in users %}
+    <tr>
+      <td>{{ u.emp_id }}</td>
+      <td>{{ u.name }}</td>
+      <td>{{ u.email }}</td>
+      <td><span class="pill outline">{{ u.domain }}</span></td>
+      <td><span class="pill {{ 'high' if u.status == 'active' else 'low' }}">{{ u.status }}</span></td>
+      <td>{{ u.last_login[:16] if u.last_login else "—" }}</td>
+      <td style="display:flex; gap:.4rem;">
+        <form action="{{ url_for('admin.users_reset_password', user_id=u.id) }}" method="post" onsubmit="return confirm('Reset password for {{ u.name }}?');">
+          <button type="submit" class="btn secondary sm">↻ Reset</button>
+        </form>
+        <form action="{{ url_for('admin.users_delete', user_id=u.id) }}" method="post" onsubmit="return confirm('Delete {{ u.name }} and all their data?');">
+          <button type="submit" class="btn danger sm">🗑 Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7">No users yet.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

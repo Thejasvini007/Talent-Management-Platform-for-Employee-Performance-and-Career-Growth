@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% set active_page = "exams" %}
+{% block title %}{{ assignment.title }} · Talent Sphere Elevate{% endblock %}
+{% block page_title %}{{ assignment.title }}{% endblock %}
+
+{% block content %}
+{% set total_marks = questions | sum(attribute='marks') %}
+
+<div id="start-screen" class="card static" style="max-width:480px; margin:2.5rem auto; text-align:center; padding:2.2rem 2rem;">
+  <div style="font-size:2.2rem; margin-bottom:.6rem;">📝</div>
+  <h2 style="margin-bottom:.3rem;">{{ assignment.title }}</h2>
+  <p style="color:var(--ls-text-2); font-size:.9rem; margin-bottom:1.2rem;">
+    {{ questions|length }} questions · {{ total_marks }} marks · {{ assignment.duration or 30 }} minutes
+  </p>
+  <p style="font-size:.85rem; color:var(--ls-text); text-align:left; background:var(--ls-bg); border-radius:10px; padding:1rem; margin-bottom:1.4rem;">
+    The exam runs in fullscreen. Switching tabs, minimising, or exiting fullscreen is a violation.
+    You get a maximum of {{ max_warnings }} warnings — the next violation submits your exam automatically.
+  </p>
+  <button type="button" class="btn" style="width:100%; justify-content:center;" onclick="beginExam()">▶ Begin exam in fullscreen</button>
+  <a href="{{ url_for('exams.my_exams') }}" style="display:block; margin-top:.9rem; font-size:.85rem; color:var(--ls-text-2);">Cancel</a>
+</div>
+
+<div id="exam-screen" style="display:none;">
+  <div class="card static" style="margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center;">
+    <div>
+      <strong>{{ assignment.title }}</strong>
+      <div style="font-size:.8rem; color:var(--ls-text-2);">{{ questions|length }} questions · stay in fullscreen</div>
+    </div>
+    <div style="display:flex; align-items:center; gap:.8rem;">
+      <div id="violation-badge" class="pill warn" style="display:none;"></div>
+      <div id="timer" class="pill mid" style="font-variant-numeric:tabular-nums;">--:--</div>
+      <button type="button" class="btn sm" onclick="submitExam(false)">✔ Submit</button>
+    </div>
+  </div>
+
+  <form id="exam-form">
+    {% for q in questions %}
+    <div class="card" style="margin-bottom:1rem;">
+      <h3 style="font-size:.95rem;">Q{{ loop.index }}. {{ q.question }} <span class="pill outline">{{ q.marks }} marks</span></h3>
+      <textarea class="f-textarea" name="q_{{ q.id }}" placeholder="Type your answer…"></textarea>
+    </div>
+    {% endfor %}
+  </form>
+</div>
+
+<script>
+const assignmentId = {{ assignment.assignment_id }};
+const maxWarnings = {{ max_warnings }};
+const durationMinutes = {{ assignment.duration or 30 }};
+const badge = document.getElementById('violation-badge');
+const timerEl = document.getElementById('timer');
+let timerInterval = null;
+let secondsLeft = durationMinutes * 60;
+
+function beginExam() {
+  document.getElementById('start-screen').style.display = 'none';
+  document.getElementById('exam-screen').style.display = 'block';
+  document.documentElement.requestFullscreen?.().catch(() => {});
+  startTimer();
+}
+
+function startTimer() {
+  updateTimerDisplay();
+  timerInterval = setInterval(() => {
+    secondsLeft--;
+    updateTimerDisplay();
+    if (secondsLeft <= 0) {
+      clearInterval(timerInterval);
+      submitExam(true);
+    }
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  const m = Math.max(0, Math.floor(secondsLeft / 60));
+  const s = Math.max(0, secondsLeft % 60);
+  timerEl.textContent = `${m}:${s.toString().padStart(2, '0')}`;
+  if (secondsLeft <= 60) timerEl.classList.add('danger');
+}
+
+async function reportViolation(reason) {
+  const res = await fetch(`/api/exams/${assignmentId}/violation`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({reason})
+  });
+  const data = await res.json();
+  badge.style.display = 'inline-block';
+  badge.textContent = data.message;
+  if (data.terminate) submitExam(true);
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && timerInterval) reportViolation('tab switch');
+});
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement && timerInterval) reportViolation('exited fullscreen');
+});
+
+async function submitExam(terminated = false) {
+  if (timerInterval) clearInterval(timerInterval);
+  const answers = {};
+  {% for q in questions %}
+  answers["{{ q.id }}"] = document.querySelector('[name="q_{{ q.id }}"]')?.value || "";
+  {% endfor %}
+
+  const res = await fetch(`/api/exams/${assignmentId}/submit`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({answers, terminated})
+  });
+  const data = await res.json();
+  if (data.ok) {
+    alert(`Submitted! Score: ${data.total_score}/${data.max_score} (${data.pct}%)`);
+    window.location.href = "{{ url_for('exams.my_exams') }}";
+  }
+}
+</script>
+{% endblock %}

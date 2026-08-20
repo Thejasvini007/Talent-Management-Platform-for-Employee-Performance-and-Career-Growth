@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% set active_page = "documents" %}
+
+{% block title %}Document Ingestion · Talent Sphere Elevate{% endblock %}
+
+{% block page_title %}Document Ingestion{% endblock %}
+
+{% block content %}
+
+<div class="section-h">
+  <h2>📤 Document Ingestion</h2>
+  <p>Upload training PDFs — chunked, embedded, and instantly searchable. Duplicates are detected automatically.</p>
+</div>
+
+<div class="card">
+  <form action="{{ url_for('admin.documents_upload') }}" method="post" enctype="multipart/form-data">
+    <label class="f-label">PDF files</label>
+    <input class="f-input" type="file" name="pdfs" accept="application/pdf" multiple required>
+    <div style="margin-top: 1rem;">
+      <button type="submit" class="btn">🔍 Build Index</button>
+    </div>
+  </form>
+</div>
+
+<div class="grid cols-3" style="margin-top: 1.2rem;">
+  <div class="metric">
+    <div class="v">{{ documents|length }}</div>
+    <div class="l">Documents</div>
+  </div>
+  <div class="metric">
+    <div class="v">{{ index.total_chunks if index and index.total_chunks else 0 }}</div>
+    <div class="l">Total Chunks</div>
+  </div>
+  <div class="metric">
+    <div class="v">{{ documents|length }}</div>
+    <div class="l">Stored PDFs</div>
+  </div>
+</div>
+
+<div class="section-h" style="margin-top: 1.6rem;">
+  <h2>Indexed Documents</h2>
+</div>
+
+<div class="table-wrap">
+  <table class="data">
+    <tr>
+      <th>Document</th>
+      <th>Pages</th>
+      <th>Chunks</th>
+      <th>Size (KB)</th>
+      <th>Uploaded by</th>
+      <th>Uploaded at</th>
+    </tr>
+    {% for doc in documents %}
+    <tr>
+      <td>{{ doc.filename }}</td>
+      <td>{{ doc.pages }}</td>
+      <td>{{ doc.chunks }}</td>
+      <td>{{ "%.0f"|format(doc.size_kb) }}</td>
+      <td>{{ doc.uploaded_by }}</td>
+      <td>{{ doc.uploaded_at[:10] if doc.uploaded_at else "" }}</td>
+    </tr>
+    {% else %}
+    <tr>
+      <td colspan="6">No documents uploaded yet.</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+
+<div class="section-h" style="margin-top: 1.6rem;">
+  <h2 style="color: var(--ls-danger);">Danger Zone</h2>
+  <p>Clear the entire knowledge base (stored PDF files are kept on disk).</p>
+</div>
+
+<div class="card">
+  <form action="{{ url_for('admin.documents_reset') }}" method="post"
+        onsubmit="return confirm('Clear the entire knowledge base? This cannot be undone.');">
+    <button type="submit" class="btn danger">🗑️ Clear Knowledge Base</button>
+  </form>
+</div>
+
+{% endblock %}
